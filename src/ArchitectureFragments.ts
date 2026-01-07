@@ -6,6 +6,7 @@ export class ArchitectureFragments {
 
     constructor(components: OBC.Components) {
         this.fragments = components.get(OBC.FragmentsManager);
+        console.log("Fragments Manager Initialized", this.fragments);
     }
 
     createWall(points: THREE.Vector3[], height: number, thickness: number) {

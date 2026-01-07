@@ -9,15 +9,17 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/three": "^0.182.0",
     "typescript": "^5.0.0",
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "three": "^0.160.0",
-    "@thatopen/components": "^3.0.0",
+    "@thatopen/components": "^3.2.7",
     "@thatopen/components-front": "^3.0.0",
+    "@thatopen/fragments": "^3.2.13",
     "@thatopen/ui": "^3.0.0",
     "@thatopen/ui-obc": "^3.0.0",
-    "web-ifc": "^0.0.50"
+    "three": "^0.175.0",
+    "web-ifc": "^0.0.72"
   }
 }

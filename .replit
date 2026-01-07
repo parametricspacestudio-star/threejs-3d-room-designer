@@ -15,15 +15,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Blueprint3D Server"
+args = "Hybrid BIM Server"
 
 [[workflows.workflow]]
-name = "Blueprint3D Server"
+name = "Hybrid BIM Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node server.js"
+args = "npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]

@@ -27,6 +27,7 @@ async function init() {
     
     // Initialize Managers
     const fragments = components.get(OBC.FragmentsManager);
+    console.log("Fragments Manager ready", fragments);
     const arch = new ArchitectureFragments(components);
     
     // Setup Highlighter
