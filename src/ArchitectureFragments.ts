@@ -2,28 +2,29 @@ import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 
 export class ArchitectureFragments {
-    private fragments: OBC.FragmentsManager;
     private components: OBC.Components;
 
     constructor(components: OBC.Components) {
         this.components = components;
-        this.fragments = components.get(OBC.FragmentsManager);
     }
 
     createWall(points: THREE.Vector3[], height: number, thickness: number) {
-        if (points.length < 2) return;
+        if (points.length < 2) return null;
         
-        const length = points[0].distanceTo(points[1]);
+        const start = points[0];
+        const end = points[1];
+        const length = start.distanceTo(end);
+        
         const geometry = new THREE.BoxGeometry(thickness, height, length);
         const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
         const mesh = new THREE.Mesh(geometry, material);
         
-        const center = points[0].clone().add(points[1]).multiplyScalar(0.5);
+        const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
         mesh.position.copy(center);
         mesh.position.y += height / 2;
-        mesh.lookAt(points[1]);
+        
+        mesh.lookAt(end);
 
-        // Access the scene three object safely
         const worlds = this.components.get(OBC.Worlds);
         const world = worlds.list.values().next().value;
         if (world && world.scene) {
@@ -33,8 +34,8 @@ export class ArchitectureFragments {
         return mesh;
     }
 
-    createSlab(points: THREE.Vector3[], thickness: number) {
-        const geometry = new THREE.BoxGeometry(10, thickness, 10);
+    createSlab(width: number, depth: number, thickness: number) {
+        const geometry = new THREE.BoxGeometry(width, thickness, depth);
         const material = new THREE.MeshStandardMaterial({ color: 0x404040 });
         const mesh = new THREE.Mesh(geometry, material);
         
