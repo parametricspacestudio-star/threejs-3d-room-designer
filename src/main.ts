@@ -39,6 +39,8 @@ async function init() {
     world.renderer = new OBC.SimpleRenderer(components, viewport);
     world.camera = new OBC.OrthoPerspectiveCamera(components);
     
+    // Proper initialization
+    fragments.init("https://unpkg.com/@thatopen/fragments@3.2.13/dist/Worker/worker.mjs");
     components.init();
 
     // Furniture Placement
@@ -49,7 +51,7 @@ async function init() {
             model.position.set(0, 0, 0);
             world.scene.three.add(model);
             console.log("Furniture added to world.scene.three");
-        });
+        }, undefined, (err) => console.error("Load error:", err));
     };
 
     // Create UI
@@ -93,13 +95,6 @@ async function init() {
     highlighter.setup({ world });
     const grids = components.get(OBC.Grids);
     grids.create(world);
-    
-    // Selection Event
-    highlighter.events.select.onHighlight.add((selection) => {
-        console.log("Selected:", selection);
-        const panel = document.getElementById('properties-panel');
-        if (panel) panel.textContent = `Selected Fragment: ${Object.keys(selection)[0] || 'None'}`;
-    });
     
     // Initial Camera View
     await world.camera.controls.setLookAt(10, 10, 10, 0, 0, 0);
