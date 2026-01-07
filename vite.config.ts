@@ -14,6 +14,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['web-ifc']
+    exclude: ['web-ifc', 'three']
   }
 });

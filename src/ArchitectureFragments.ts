@@ -3,36 +3,56 @@ import * as OBC from '@thatopen/components';
 
 export class ArchitectureFragments {
     private fragments: OBC.FragmentsManager;
+    private components: OBC.Components;
 
     constructor(components: OBC.Components) {
+        this.components = components;
         this.fragments = components.get(OBC.FragmentsManager);
-        console.log("Fragments Manager Initialized", this.fragments);
     }
 
     createWall(points: THREE.Vector3[], height: number, thickness: number) {
-        // Implementation for creating OBC Fragments from points
-        const fragmentManager = this.fragments;
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        if (points.length < 2) return;
+        
+        console.log("Generating IFCWALL Fragment...", points);
+        
+        // In That Open Engine, we use FragmentsManager to create and manage IFC entities.
+        // We define a fragment with geometry and then add it to the manager.
+        const length = points[0].distanceTo(points[1]);
+        const geometry = new THREE.BoxGeometry(thickness, height, length);
         const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
-        
-        // This is a placeholder for actual fragment creation
-        // In a real implementation, we'd use fragmentManager.core.add()
-        console.log("Creating IFCWALL fragment", points, height, thickness);
-        
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.scale.set(thickness, height, points[0].distanceTo(points[1]));
+        
+        // Position and rotate
         const center = points[0].clone().add(points[1]).multiplyScalar(0.5);
         mesh.position.copy(center);
         mesh.position.y += height / 2;
         mesh.lookAt(points[1]);
+
+        // Convert to Fragment
+        const fragment = this.fragments.core.add([mesh]);
+        fragment.mesh.name = "IFCWALL";
         
-        // For now, we add to a temporary object to show something is happening
-        // Requirements state MUST be created as OBC Fragments
-        // Since we are in a dev setup, we'll log the intent as per BIM architecture rules
+        // Add to scene via fragments manager
+        this.fragments.list.set(fragment.id, fragment);
+        
+        console.log("IFCWALL Fragment created with ID:", fragment.id);
+        return fragment;
     }
 
-    createSlab(points: THREE.Vector2[], thickness: number) {
-        // Implementation for IFCSLAB
-        console.log("Creating IFCSLAB fragment", points, thickness);
+    createSlab(points: THREE.Vector3[], thickness: number) {
+        console.log("Generating IFCSLAB Fragment...", points);
+        
+        // Simplified slab creation for demo
+        const geometry = new THREE.BoxGeometry(10, thickness, 10);
+        const material = new THREE.MeshStandardMaterial({ color: 0x404040 });
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        mesh.position.y = -thickness / 2;
+        
+        const fragment = this.fragments.core.add([mesh]);
+        fragment.mesh.name = "IFCSLAB";
+        this.fragments.list.set(fragment.id, fragment);
+        
+        return fragment;
     }
 }
