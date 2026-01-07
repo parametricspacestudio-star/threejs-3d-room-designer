@@ -20,11 +20,14 @@ A modern 3D room configurator that combines standard GLB furniture placement wit
 - **Build Tool**: Vite
 - **Language**: TypeScript
 
+## Features
+- **Dynamic Slab Creation**: User-defined room dimensions via modal UI.
+- **Perpendicular Wall Placement**: Automatically align walls to slab edges.
+- **Furniture Catalog**: Catalog of GLB models for interior configuration.
+- **BIM Integration**: Architectural elements are managed as components in the OBC ecosystem.
+
 ## Running the Application
 ```bash
 npm run dev
 ```
 The application will be available on port 5000.
-
-## Development Status
-The application is in a hybrid state where BIM components are integrated into the Three.js viewport, and a professional HUD provides tools for architectural element creation.

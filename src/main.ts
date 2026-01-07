@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import * as OBCF from '@thatopen/components-front';
 import * as BUI from '@thatopen/ui';
-import * as BUIC from '@thatopen/ui-obc';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ArchitectureFragments } from './ArchitectureFragments';
 
@@ -36,7 +35,8 @@ async function init() {
     world.renderer = new OBC.SimpleRenderer(components, viewport);
     world.camera = new OBC.OrthoPerspectiveCamera(components);
     
-    components.get(OBC.FragmentsManager).init();
+    const fragments = components.get(OBC.FragmentsManager);
+    fragments.init();
     components.init();
 
     const addFurniture = (modelPath: string) => {
@@ -49,7 +49,9 @@ async function init() {
             world.scene.three.add(model);
             console.log("Furniture added successfully:", fullPath);
         }, (progress) => {
-            console.log(`Loading ${fullPath}: ${(progress.loaded / progress.total * 100).toFixed(2)}%`);
+            if (progress.total > 0) {
+                console.log(`Loading ${fullPath}: ${(progress.loaded / progress.total * 100).toFixed(2)}%`);
+            }
         }, (err) => {
             console.error("Furniture load error for:", fullPath, err);
         });
@@ -60,7 +62,7 @@ async function init() {
     let slabDepth = 10;
 
     const createRoomModal = () => {
-        const modal = BUI.Component.create<BUI.Modal>(() => {
+        const modal = BUI.Component.create<any>(() => {
             return BUI.html`
                 <bim-modal label="Room Dimensions" icon="measurement">
                     <bim-panel style="padding: 1rem; gap: 1rem; display: flex; flex-direction: column;">
@@ -137,6 +139,7 @@ async function init() {
     components.get(OBC.Grids).create(world);
     
     await world.camera.controls.setLookAt(10, 10, 10, 0, 0, 0);
+    console.log("Hybrid BIM Configurator Ready.");
 }
 
 init().catch(err => console.error(err));
