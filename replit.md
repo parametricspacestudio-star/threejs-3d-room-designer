@@ -1,30 +1,30 @@
-# Blueprint3D Room Configurator
+# Hybrid BIM Configurator
 
 ## Overview
-A 3D room configurator application built with React.js, allowing users to design and visualize room layouts with furniture and fixtures. This is a pre-built static application.
+A modern 3D room configurator that combines standard GLB furniture placement with architectural BIM data management using "That Open Company" components.
 
 ## Project Architecture
 
 ### Structure
-- `/` - Root contains pre-built static assets (index.html, favicon, manifests)
-- `/static/` - Compiled CSS and JavaScript bundles
-- `/Blueprint3D-assets/` - 3D model assets (GLB files) for furniture and room elements
-- `/screenshots/` - Application screenshots
-- `server.js` - Node.js static file server
+- `/src/` - TypeScript source code
+  - `main.ts` - Main entry point, scene orchestration, and OBC UI initialization.
+  - `ArchitectureFragments.ts` - Management of BIM-compliant architectural geometry (Walls, Slabs).
+- `/public/` - Static assets served by Vite
+  - `Blueprint3D-assets/` - 3D model library (.glb).
+- `vite.config.ts` - Optimized build pipeline for BIM components.
 
 ### Technology Stack
-- **Frontend**: React.js (pre-compiled)
-- **3D Engine**: Three.js
-- **Server**: Node.js static file server
-- **Port**: 5000
+- **3D Engine**: Three.js & @thatopen/components
+- **UI Framework**: @thatopen/ui (BUI)
+- **BIM Core**: @thatopen/fragments
+- **Build Tool**: Vite
+- **Language**: TypeScript
 
 ## Running the Application
-The application runs via a simple Node.js static server:
 ```bash
-node server.js
+npm run dev
 ```
+The application will be available on port 5000.
 
-This serves all static files on port 5000.
-
-## Deployment
-Configured as a static deployment serving the pre-built files.
+## Development Status
+The application is in a hybrid state where BIM components are integrated into the Three.js viewport, and a professional HUD provides tools for architectural element creation.

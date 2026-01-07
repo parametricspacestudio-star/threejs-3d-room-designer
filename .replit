@@ -39,4 +39,4 @@ externalPort = 3001
 
 [deployment]
 deploymentTarget = "static"
-publicDir = "."
+publicDir = "dist"
