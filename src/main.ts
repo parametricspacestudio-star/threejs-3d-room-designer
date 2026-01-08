@@ -131,7 +131,13 @@ async function init() {
                             obj.geometry.dispose();
                             obj.geometry = newGeo;
                             obj.position.y = -(d.thickness || 0.2) / 2;
+                        } else if (d.type === 'Furniture') {
+                            if (k === 'posX') obj.position.x = val;
+                            if (k === 'posZ') obj.position.z = val;
                         }
+                    } else if (obj instanceof THREE.Group && obj.userData.type === 'Furniture') {
+                         if (k === 'posX') obj.position.x = val;
+                         if (k === 'posZ') obj.position.z = val;
                     }
                 });
                 updateInspector(obj);
@@ -144,22 +150,49 @@ async function init() {
         const fullPath = `/Blueprint3D-assets/models/glb/special/${modelName}`;
         gltfLoader.load(fullPath, (gltf) => {
             const model = gltf.scene;
-            model.userData = { type: 'Furniture', name: modelName.replace('.glb', ''), id: THREE.MathUtils.generateUUID() };
+            model.userData = { 
+                type: 'Furniture', 
+                name: modelName.replace('.glb', ''), 
+                id: THREE.MathUtils.generateUUID(),
+                posX: 0,
+                posZ: 0
+            };
             model.traverse((child) => {
                 if (child instanceof THREE.Mesh) child.userData = model.userData;
             });
             world.scene.three.add(model);
+            updateInspector(model);
         }, undefined, () => {
             const fallbackPath = `/Blueprint3D-assets/models/glb/${modelName}`;
             gltfLoader.load(fallbackPath, (gltf) => {
                 const model = gltf.scene;
-                model.userData = { type: 'Furniture', name: modelName.replace('.glb', ''), id: THREE.MathUtils.generateUUID() };
+                model.userData = { 
+                    type: 'Furniture', 
+                    name: modelName.replace('.glb', ''), 
+                    id: THREE.MathUtils.generateUUID(),
+                    posX: 0,
+                    posZ: 0
+                };
                 model.traverse((child) => {
                     if (child instanceof THREE.Mesh) child.userData = model.userData;
                 });
                 world.scene.three.add(model);
+                updateInspector(model);
             });
         });
+    };
+
+    const fitToView = () => {
+        const box = new THREE.Box3().setFromObject(world.scene.three);
+        if (box.isEmpty()) return;
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = world.camera.three.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 4 * Math.tan(fov * 2));
+        cameraZ *= 3; // zoom out a bit
+        
+        world.camera.controls.setLookAt(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ, center.x, center.y, center.z, true);
     };
 
     const createRoomModal = () => {
@@ -212,6 +245,9 @@ async function init() {
             <div style="position: fixed; inset: 0; pointer-events: none; z-index: 99999; display: flex; justify-content: space-between; padding: 1.5rem;">
                 <div style="pointer-events: auto; width: 340px; display: flex; flex-direction: column; gap: 1rem; background: rgba(255, 255, 255, 0.95); padding: 1.5rem; border-radius: 12px; border: 1px solid #ddd; height: fit-content; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
                     <h2 style="color: #1a1b1e; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.4rem; border-bottom: 2px solid #007bff; padding-bottom: 0.6rem;">BIM Configurator</h2>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <bim-button label="Fit View" icon="fullscreen" @click=${fitToView}></bim-button>
+                    </div>
                     <bim-panel label="Construction" active expanded>
                         <bim-panel-section label="Setup" expanded>
                             <div style="display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem;">
