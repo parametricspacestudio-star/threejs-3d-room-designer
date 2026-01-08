@@ -39,44 +39,55 @@ async function init() {
     fragments.init();
     components.init();
 
-    const addFurniture = (modelPath: string) => {
-        // Assets are served from /Blueprint3D-assets/models/glb/special/
-        const fullPath = `./Blueprint3D-assets/models/glb/special/${modelPath}`;
-        console.log("Loading furniture from:", fullPath);
+    const addFurniture = (modelName: string) => {
+        // Furniture is located in /Blueprint3D-assets/models/glb/special/
+        const fullPath = `/Blueprint3D-assets/models/glb/special/${modelName}`;
+        console.log("Furniture Load Request:", fullPath);
         
         gltfLoader.load(fullPath, (gltf) => {
             const model = gltf.scene;
             model.position.set(0, 0, 0);
             world.scene.three.add(model);
-            console.log("Furniture added successfully:", fullPath);
-        }, (progress) => {
-            if (progress.total > 0) {
-                console.log(`Loading ${fullPath}: ${(progress.loaded / progress.total * 100).toFixed(2)}%`);
-            }
-        }, (err) => {
-            console.error("Furniture load error for:", fullPath, err);
+            console.log("Furniture displayed successfully.");
+        }, (xhr) => {
+            if (xhr.total > 0) console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        }, (error) => {
+            console.error("Furniture display failed:", error);
+            // Fallback for root models directory if special fails
+            const fallbackPath = `/Blueprint3D-assets/models/glb/${modelName}`;
+            gltfLoader.load(fallbackPath, (gltf) => {
+                world.scene.three.add(gltf.scene);
+                console.log("Furniture loaded from fallback.");
+            });
         });
     };
 
+    let slabWidth = 6;
+    let slabDepth = 6;
     let currentSlab: THREE.Mesh | null = null;
-    let slabWidth = 5;
-    let slabDepth = 5;
 
     const createRoomModal = () => {
         const modal = BUI.Component.create<any>(() => {
             return BUI.html`
-                <bim-modal label="Room Dimensions" icon="measurement">
-                    <bim-panel style="padding: 1rem; gap: 1rem; display: flex; flex-direction: column; background: #202124;">
-                        <bim-label style="color: white;">Set Room Size (Meters):</bim-label>
-                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.8rem; align-items: center;">
-                             <bim-label style="color: #aaa;">X (Width):</bim-label>
-                             <input type="number" .value="${slabWidth.toString()}" @input="${(e: any) => slabWidth = Number(e.target.value)}" style="background: #333; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px; outline: none;">
-                             
-                             <bim-label style="color: #aaa;">Y (Depth):</bim-label>
-                             <input type="number" .value="${slabDepth.toString()}" @input="${(e: any) => slabDepth = Number(e.target.value)}" style="background: #333; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px; outline: none;">
+                <bim-modal label="Room Configuration" icon="measurement">
+                    <bim-panel style="padding: 1.5rem; gap: 1.2rem; display: flex; flex-direction: column; background: #1a1b1e; min-width: 300px;">
+                        <bim-label style="color: #fff; font-size: 1.1rem; font-weight: bold;">Define Room Dimensions</bim-label>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                <bim-label style="color: #999;">Dimension X (M):</bim-label>
+                                <input type="number" .value="${slabWidth.toString()}" @input="${(e: any) => slabWidth = Number(e.target.value)}" 
+                                    style="background: #2a2b2e; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                <bim-label style="color: #999;">Dimension Y (M):</bim-label>
+                                <input type="number" .value="${slabDepth.toString()}" @input="${(e: any) => slabDepth = Number(e.target.value)}" 
+                                    style="background: #2a2b2e; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                            </div>
                         </div>
-                        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
-                            <bim-button label="Generate Slab" @click=${() => {
+
+                        <div style="margin-top: 1rem;">
+                            <bim-button label="Generate Room Slab" style="width: 100%;" @click=${() => {
                                 if (currentSlab) world.scene.three.remove(currentSlab);
                                 currentSlab = arch.createSlab(slabWidth, slabDepth, 0.2);
                                 modal.active = false;
@@ -90,47 +101,52 @@ async function init() {
         modal.active = true;
     };
 
-    const placeWallOnEdge = (edge: 'north' | 'south' | 'east' | 'west') => {
+    const placeWallOnEdge = (edge: 'N' | 'S' | 'E' | 'W') => {
         if (!currentSlab) {
-            alert("Please create a slab first.");
+            alert("Define slab dimensions first!");
             return;
         }
-        
         const w = slabWidth / 2;
         const d = slabDepth / 2;
         let p1, p2;
 
-        if (edge === 'north') { p1 = new THREE.Vector3(-w, 0, -d); p2 = new THREE.Vector3(w, 0, -d); }
-        else if (edge === 'south') { p1 = new THREE.Vector3(-w, 0, d); p2 = new THREE.Vector3(w, 0, d); }
-        else if (edge === 'east') { p1 = new THREE.Vector3(w, 0, -d); p2 = new THREE.Vector3(w, 0, d); }
+        if (edge === 'N') { p1 = new THREE.Vector3(-w, 0, -d); p2 = new THREE.Vector3(w, 0, -d); }
+        else if (edge === 'S') { p1 = new THREE.Vector3(-w, 0, d); p2 = new THREE.Vector3(w, 0, d); }
+        else if (edge === 'E') { p1 = new THREE.Vector3(w, 0, -d); p2 = new THREE.Vector3(w, 0, d); }
         else { p1 = new THREE.Vector3(-w, 0, -d); p2 = new THREE.Vector3(-w, 0, d); }
 
-        arch.createWall([p1, p2], 2.5, 0.15);
+        arch.createWall([p1, p2], 2.8, 0.15);
     };
 
     const mainLayout = BUI.Component.create<BUI.PanelSection>(() => {
         return BUI.html`
-            <div style="position: fixed; inset: 0; pointer-events: none; z-index: 99999; display: flex; justify-content: space-between; padding: 2rem;">
-                <div style="pointer-events: auto; width: 340px; display: flex; flex-direction: column; gap: 1rem; background: rgba(32, 33, 36, 0.95); padding: 1.5rem; border-radius: 12px; border: 1px solid #444; height: fit-content; box-shadow: 0 8px 32px rgba(0,0,0,0.6);">
-                    <h2 style="color: white; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.4rem; border-bottom: 1px solid #555; padding-bottom: 0.5rem; letter-spacing: 0.5px;">Hybrid BIM Hub</h2>
-                    <bim-panel label="Construction" icon="gear" active expanded>
-                        <bim-panel-section label="Slab Controls" icon="wall" expanded>
-                            <div style="display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem;">
+            <div style="position: fixed; inset: 0; pointer-events: none; z-index: 99999; display: flex; justify-content: space-between; padding: 1.5rem;">
+                <div style="pointer-events: auto; width: 340px; display: flex; flex-direction: column; gap: 1rem; background: rgba(26, 27, 30, 0.98); padding: 1.5rem; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 40px rgba(0,0,0,0.7);">
+                    <h2 style="color: #fff; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.3rem; border-bottom: 2px solid #444; padding-bottom: 0.6rem;">BIM Hub v2</h2>
+                    
+                    <bim-panel label="Construction" active expanded>
+                        <bim-panel-section label="Room Setup" icon="wall" expanded>
+                            <div style="display: flex; flex-direction: column; gap: 1.2rem; padding: 0.5rem;">
                                 <bim-button label="1. Set X/Y Dimensions" @click=${createRoomModal}></bim-button>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
-                                    <bim-button label="Wall North" @click=${() => placeWallOnEdge('north')}></bim-button>
-                                    <bim-button label="Wall South" @click=${() => placeWallOnEdge('south')}></bim-button>
-                                    <bim-button label="Wall East" @click=${() => placeWallOnEdge('east')}></bim-button>
-                                    <bim-button label="Wall West" @click=${() => placeWallOnEdge('west')}></bim-button>
+                                
+                                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                                    <bim-label style="color: #777; font-size: 0.8rem;">Add Walls to Edges:</bim-label>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                        <bim-button label="Wall North" @click=${() => placeWallOnEdge('N')}></bim-button>
+                                        <bim-button label="Wall South" @click=${() => placeWallOnEdge('S')}></bim-button>
+                                        <bim-button label="Wall East" @click=${() => placeWallOnEdge('E')}></bim-button>
+                                        <bim-button label="Wall West" @click=${() => placeWallOnEdge('W')}></bim-button>
+                                    </div>
                                 </div>
                             </div>
                         </bim-panel-section>
-                        <bim-panel-section label="Library" icon="chair" expanded>
-                            <div style="display: flex; flex-direction: column; gap: 0.8rem; padding: 0.5rem;">
-                                <bim-button label="Add Chair" @click=${() => addFurniture('chair.glb')}></bim-button>
-                                <bim-button label="Add Table" @click=${() => addFurniture('table.glb')}></bim-button>
-                                <bim-button label="Add Sofa" @click=${() => addFurniture('loungeSofa.glb')}></bim-button>
-                                <bim-button label="Add Bed" @click=${() => addFurniture('bedDouble.glb')}></bim-button>
+
+                        <bim-panel-section label="Furniture Library" icon="chair" expanded>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; padding: 0.5rem;">
+                                <bim-button label="Chair" @click=${() => addFurniture('chair.glb')}></bim-button>
+                                <bim-button label="Table" @click=${() => addFurniture('table.glb')}></bim-button>
+                                <bim-button label="Sofa" @click=${() => addFurniture('loungeSofa.glb')}></bim-button>
+                                <bim-button label="Bed" @click=${() => addFurniture('bedDouble.glb')}></bim-button>
                             </div>
                         </bim-panel-section>
                     </bim-panel>
@@ -144,8 +160,8 @@ async function init() {
     components.get(OBCF.Highlighter).setup({ world });
     components.get(OBC.Grids).create(world);
     
-    await world.camera.controls.setLookAt(8, 8, 8, 0, 0, 0);
+    await world.camera.controls.setLookAt(10, 10, 10, 0, 0, 0);
     console.log("Hybrid BIM Configurator Ready.");
 }
 
-init().catch(err => console.error("Initialization Failed:", err));
+init().catch(err => console.error(err));
