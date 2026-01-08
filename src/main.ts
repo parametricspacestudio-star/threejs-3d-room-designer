@@ -127,45 +127,83 @@ async function init() {
         selectedObject = obj;
         const data = obj.userData;
         
-        let html = `<h3 style="margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 0.8rem; color: #1a1b1e;">Property Editor</h3>`;
+        propertyPanel.textContent = '';
+        
+        const header = document.createElement('h3');
+        header.style.cssText = 'margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 0.8rem; color: #1a1b1e;';
+        header.textContent = 'Property Editor';
+        propertyPanel.appendChild(header);
         
         for (const [key, value] of Object.entries(data)) {
             if (key === 'id') {
-                html += `<div style="margin: 0.8rem 0; font-size: 0.75rem; color: #888;">ID: ${value}</div>`;
+                const idDiv = document.createElement('div');
+                idDiv.style.cssText = 'margin: 0.8rem 0; font-size: 0.75rem; color: #888;';
+                idDiv.textContent = `ID: ${value}`;
+                propertyPanel.appendChild(idDiv);
                 continue;
             }
             
             const isNumber = typeof value === 'number';
-            html += `
-                <div style="margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;">
-                    <label style="color: #666; font-size: 0.85rem;">${key}:</label>
-                    <input type="${isNumber ? 'number' : 'text'}" 
-                           value="${value}" 
-                           data-key="${key}"
-                           style="background: #f8f9fa; border: 1px solid #ced4da; padding: 6px; border-radius: 4px; outline: none;"
-                           class="prop-input">
-                </div>
-            `;
+            const container = document.createElement('div');
+            container.style.cssText = 'margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;';
+            
+            const label = document.createElement('label');
+            label.style.cssText = 'color: #666; font-size: 0.85rem;';
+            label.textContent = `${key}:`;
+            
+            const input = document.createElement('input');
+            input.type = isNumber ? 'number' : 'text';
+            input.value = String(value);
+            input.setAttribute('data-key', key);
+            input.style.cssText = 'background: #f8f9fa; border: 1px solid #ced4da; padding: 6px; border-radius: 4px; outline: none;';
+            input.className = 'prop-input';
+            
+            container.appendChild(label);
+            container.appendChild(input);
+            propertyPanel.appendChild(container);
         }
 
-        html += `
-            <div style="margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;">
-                <label style="color: #666; font-size: 0.85rem;">Material Color:</label>
-                <input type="color" id="material-color" value="#cccccc" style="width: 100%; height: 30px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;">
-            </div>
-        `;
+        const colorContainer = document.createElement('div');
+        colorContainer.style.cssText = 'margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;';
+        const colorLabel = document.createElement('label');
+        colorLabel.style.cssText = 'color: #666; font-size: 0.85rem;';
+        colorLabel.textContent = 'Material Color:';
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.id = 'material-color';
+        colorInput.value = '#cccccc';
+        colorInput.style.cssText = 'width: 100%; height: 30px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;';
+        colorContainer.appendChild(colorLabel);
+        colorContainer.appendChild(colorInput);
+        propertyPanel.appendChild(colorContainer);
 
-        html += `
-            <div style="margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                <div style="display: flex; gap: 0.5rem;">
-                    <button id="mode-translate" style="flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Move</button>
-                    <button id="mode-rotate" style="flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Rotate</button>
-                </div>
-                <button id="apply-props" style="width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Changes</button>
-            </div>
-        `;
-
-        propertyPanel.innerHTML = html;
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;';
+        
+        const modeButtonsDiv = document.createElement('div');
+        modeButtonsDiv.style.cssText = 'display: flex; gap: 0.5rem;';
+        
+        const translateBtn = document.createElement('button');
+        translateBtn.id = 'mode-translate';
+        translateBtn.style.cssText = 'flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;';
+        translateBtn.textContent = 'Move';
+        
+        const rotateBtn = document.createElement('button');
+        rotateBtn.id = 'mode-rotate';
+        rotateBtn.style.cssText = 'flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;';
+        rotateBtn.textContent = 'Rotate';
+        
+        modeButtonsDiv.appendChild(translateBtn);
+        modeButtonsDiv.appendChild(rotateBtn);
+        
+        const applyBtn = document.createElement('button');
+        applyBtn.id = 'apply-props';
+        applyBtn.style.cssText = 'width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;';
+        applyBtn.textContent = 'Save Changes';
+        
+        buttonContainer.appendChild(modeButtonsDiv);
+        buttonContainer.appendChild(applyBtn);
+        propertyPanel.appendChild(buttonContainer);
 
         propertyPanel.querySelector('#mode-translate')?.addEventListener('click', () => transformControls.setMode('translate'));
         propertyPanel.querySelector('#mode-rotate')?.addEventListener('click', () => transformControls.setMode('rotate'));
