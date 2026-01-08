@@ -13,30 +13,27 @@ async function init() {
     const components = new OBC.Components();
     const worlds = components.get(OBC.Worlds);
     
-    const world = worlds.create<OBC.SimpleScene, OBC.OrthoPerspectiveCamera, OBC.SimpleRenderer>();
+    const world = worlds.create<OBC.SimpleScene, OBC.SimpleCamera, OBC.SimpleRenderer>();
     world.name = 'main';
     const sceneComponent = new OBC.SimpleScene(components);
     sceneComponent.setup();
     world.scene = sceneComponent;
     
-    world.scene.three.background = new THREE.Color(0xffffff);
+    world.scene.three.background = new THREE.Color(0x202124);
     
     const arch = new ArchitectureFragments(components);
     const gltfLoader = new GLTFLoader();
     
     const container = document.getElementById('container')!;
-    container.style.position = 'fixed';
-    container.style.inset = '0';
-    container.style.zIndex = '0';
     
     const viewport = document.createElement('bim-viewport');
-    viewport.style.width = '100%';
-    viewport.style.height = '100%';
-    viewport.style.display = 'block';
     container.appendChild(viewport);
     
     world.renderer = new OBC.SimpleRenderer(components, viewport);
-    world.camera = new OBC.OrthoPerspectiveCamera(components);
+    world.camera = new OBC.SimpleCamera(components);
+    
+    // Set initial size
+    world.renderer.three.setSize(window.innerWidth, window.innerHeight);
     
     const fragments = components.get(OBC.FragmentsManager);
     fragments.init();
@@ -212,7 +209,7 @@ async function init() {
             const color = e.target.value;
             obj.traverse((child) => {
                 if (child instanceof THREE.Mesh) {
-                    child.material.color.set(color);
+                    (child.material as THREE.MeshStandardMaterial).color.set(color);
                 }
             });
         });
@@ -242,19 +239,15 @@ async function init() {
                             if (k === 'posX') obj.position.x = val;
                             if (k === 'posZ') obj.position.z = val;
                         }
-                    } else if (obj instanceof THREE.Group && obj.userData.type === 'Furniture') {
-                         if (k === 'posX') obj.position.x = val;
-                         if (k === 'posZ') obj.position.z = val;
                     }
                 });
-                applyHighlight(obj);
             });
         }
     };
 
     const addFurniture = (modelName: string) => {
-        const fullPath = `/Blueprint3D-assets/models/glb/special/${modelName}`;
-        gltfLoader.load(fullPath, (gltf) => {
+        const specialPath = `/Blueprint3D-assets/models/glb/special/${modelName}`;
+        gltfLoader.load(specialPath, (gltf) => {
             const model = gltf.scene;
             model.userData = { 
                 type: 'Furniture', 
@@ -302,11 +295,8 @@ async function init() {
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = world.camera.three.fov * (Math.PI / 180);
-        let cameraZ = Math.abs(maxDim / 4 * Math.tan(fov * 2));
-        cameraZ *= 3; 
         
-        world.camera.controls.setLookAt(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ, center.x, center.y, center.z, true);
+        world.camera.controls.setLookAt(center.x + maxDim, center.y + maxDim, center.z + maxDim, center.x, center.y, center.z, true);
     };
 
     const unselectAll = () => {

@@ -6,12 +6,10 @@ export default defineConfig({
     port: 5000,
     allowedHosts: true,
     hmr: {
-        clientPort: 443
-    },
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
+        clientPort: 443,
+        host: '0.0.0.0',
+        protocol: 'wss'
+    }
   },
   optimizeDeps: {
     exclude: ['web-ifc', 'three']
