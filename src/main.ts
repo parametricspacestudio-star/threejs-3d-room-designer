@@ -13,27 +13,46 @@ async function init() {
     const components = new OBC.Components();
     const worlds = components.get(OBC.Worlds);
     
-    const world = worlds.create<OBC.SimpleScene, OBC.SimpleCamera, OBC.SimpleRenderer>();
+    const world = worlds.create<OBC.SimpleScene, OBC.OrthoPerspectiveCamera, OBC.SimpleRenderer>();
     world.name = 'main';
     const sceneComponent = new OBC.SimpleScene(components);
     sceneComponent.setup();
     world.scene = sceneComponent;
     
-    world.scene.three.background = new THREE.Color(0x202124);
+    world.scene.three.background = new THREE.Color(0xffffff);
     
     const arch = new ArchitectureFragments(components);
     const gltfLoader = new GLTFLoader();
     
+    // Add basic lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    world.scene.three.add(ambientLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    sunLight.position.set(10, 20, 10);
+    world.scene.three.add(sunLight);
+
     const container = document.getElementById('container')!;
     
     const viewport = document.createElement('bim-viewport');
+    viewport.style.background = '#ffffff';
     container.appendChild(viewport);
     
     world.renderer = new OBC.SimpleRenderer(components, viewport);
-    world.camera = new OBC.SimpleCamera(components);
+    world.camera = new OBC.OrthoPerspectiveCamera(components);
     
-    // Set initial size
-    world.renderer.three.setSize(window.innerWidth, window.innerHeight);
+    // Set initial size and handle resizing
+    const resize = () => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        world.renderer.three.setSize(width, height);
+        const camera = world.camera.three as THREE.PerspectiveCamera;
+        if (camera.isPerspectiveCamera) {
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        }
+    };
+    resize();
+    window.addEventListener('resize', resize);
     
     const fragments = components.get(OBC.FragmentsManager);
     fragments.init();
