@@ -44,11 +44,15 @@ async function init() {
     const resize = () => {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        world.renderer.three.setSize(width, height);
-        const camera = world.camera.three as THREE.PerspectiveCamera;
-        if (camera.isPerspectiveCamera) {
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
+        if (world.renderer) {
+            world.renderer.three.setSize(width, height);
+        }
+        if (world.camera) {
+            const camera = world.camera.three as THREE.PerspectiveCamera;
+            if (camera.isPerspectiveCamera) {
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+            }
         }
     };
     resize();
@@ -63,6 +67,9 @@ async function init() {
     highlighter.enabled = true;
 
     // Transform Controls
+    if (!world.renderer || !world.camera) {
+        throw new Error("World renderer or camera not initialized");
+    }
     const transformControls = new TransformControls(world.camera.three, world.renderer.three.domElement);
     world.scene.three.add(transformControls.getHelper());
     
