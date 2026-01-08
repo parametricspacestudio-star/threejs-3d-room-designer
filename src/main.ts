@@ -3,6 +3,7 @@ import * as OBC from '@thatopen/components';
 import * as OBCF from '@thatopen/components-front';
 import * as BUI from '@thatopen/ui';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { ArchitectureFragments } from './ArchitectureFragments';
 
 BUI.Manager.init();
@@ -45,11 +46,26 @@ async function init() {
     highlighter.setup({ world });
     highlighter.enabled = true;
 
+    // Transform Controls
+    const transformControls = new TransformControls(world.camera.three, world.renderer.three.domElement);
+    world.scene.three.add(transformControls.getHelper());
+    
+    transformControls.addEventListener('dragging-changed', (event) => {
+        world.camera.controls.enabled = !event.value;
+        if (!event.value && selectedObject) {
+            // Update userData after drag
+            selectedObject.userData.posX = Number(selectedObject.position.x.toFixed(2));
+            selectedObject.userData.posZ = Number(selectedObject.position.z.toFixed(2));
+            updateInspector(selectedObject);
+        }
+    });
+
     let slabWidth = 6;
     let slabDepth = 6;
     let wallHeight = 2.8;
     let currentSlab: THREE.Mesh | null = null;
     let selectedObject: THREE.Object3D | null = null;
+    let highlightMesh: THREE.Mesh | null = null;
 
     const propertyPanel = document.createElement('div');
     propertyPanel.style.cssText = `
@@ -64,17 +80,47 @@ async function init() {
         pointer-events: auto;
     `;
 
-    const highlightEffect = (obj: THREE.Object3D) => {
-        if (!(obj instanceof THREE.Mesh)) return;
-        const originalMaterial = obj.material;
-        const highlightMaterial = new THREE.MeshStandardMaterial({
+    const clearHighlight = () => {
+        if (highlightMesh) {
+            world.scene.three.remove(highlightMesh);
+            highlightMesh.geometry.dispose();
+            (highlightMesh.material as THREE.Material).dispose();
+            highlightMesh = null;
+        }
+        transformControls.detach();
+    };
+
+    const applyHighlight = (obj: THREE.Object3D) => {
+        clearHighlight();
+        if (!(obj instanceof THREE.Mesh || obj instanceof THREE.Group)) return;
+        
+        const box = new THREE.Box3().setFromObject(obj);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        
+        const geo = new THREE.BoxGeometry(size.x + 0.05, size.y + 0.05, size.z + 0.05);
+        const mat = new THREE.MeshStandardMaterial({
             color: 0x007bff,
             transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide
+            opacity: 0.3,
+            depthTest: false
         });
-        obj.material = highlightMaterial;
-        setTimeout(() => { obj.material = originalMaterial; }, 500);
+        
+        highlightMesh = new THREE.Mesh(geo, mat);
+        highlightMesh.position.copy(center);
+        world.scene.three.add(highlightMesh);
+        
+        transformControls.attach(obj);
+    };
+
+    const zoomToObject = (obj: THREE.Object3D) => {
+        const box = new THREE.Box3().setFromObject(obj);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        
+        const cameraPos = new THREE.Vector3().copy(center).add(new THREE.Vector3(maxDim * 2, maxDim * 2, maxDim * 2));
+        world.camera.controls.setLookAt(cameraPos.x, cameraPos.y, cameraPos.z, center.x, center.y, center.z, true);
     };
 
     const updateInspector = (obj: THREE.Object3D) => {
@@ -103,12 +149,35 @@ async function init() {
         }
 
         html += `
-            <div style="margin-top: 1.2rem; display: flex; gap: 0.5rem;">
-                <button id="apply-props" style="flex: 1; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Changes</button>
+            <div style="margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;">
+                <label style="color: #666; font-size: 0.85rem;">Material Color:</label>
+                <input type="color" id="material-color" value="#cccccc" style="width: 100%; height: 30px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;">
+            </div>
+        `;
+
+        html += `
+            <div style="margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="mode-translate" style="flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Move</button>
+                    <button id="mode-rotate" style="flex: 1; padding: 8px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">Rotate</button>
+                </div>
+                <button id="apply-props" style="width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Changes</button>
             </div>
         `;
 
         propertyPanel.innerHTML = html;
+
+        propertyPanel.querySelector('#mode-translate')?.addEventListener('click', () => transformControls.setMode('translate'));
+        propertyPanel.querySelector('#mode-rotate')?.addEventListener('click', () => transformControls.setMode('rotate'));
+        
+        propertyPanel.querySelector('#material-color')?.addEventListener('input', (e: any) => {
+            const color = e.target.value;
+            obj.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.material.color.set(color);
+                }
+            });
+        });
 
         const btn = propertyPanel.querySelector('#apply-props');
         if (btn) {
@@ -140,8 +209,7 @@ async function init() {
                          if (k === 'posZ') obj.position.z = val;
                     }
                 });
-                updateInspector(obj);
-                highlightEffect(obj);
+                applyHighlight(obj);
             });
         }
     };
@@ -158,10 +226,14 @@ async function init() {
                 posZ: 0
             };
             model.traverse((child) => {
-                if (child instanceof THREE.Mesh) child.userData = model.userData;
+                if (child instanceof THREE.Mesh) {
+                    child.userData = model.userData;
+                    child.material = (child.material as THREE.Material).clone();
+                }
             });
             world.scene.three.add(model);
             updateInspector(model);
+            applyHighlight(model);
         }, undefined, () => {
             const fallbackPath = `/Blueprint3D-assets/models/glb/${modelName}`;
             gltfLoader.load(fallbackPath, (gltf) => {
@@ -174,10 +246,14 @@ async function init() {
                     posZ: 0
                 };
                 model.traverse((child) => {
-                    if (child instanceof THREE.Mesh) child.userData = model.userData;
+                    if (child instanceof THREE.Mesh) {
+                        child.userData = model.userData;
+                        child.material = (child.material as THREE.Material).clone();
+                    }
                 });
                 world.scene.three.add(model);
                 updateInspector(model);
+                applyHighlight(model);
             });
         });
     };
@@ -190,9 +266,15 @@ async function init() {
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = world.camera.three.fov * (Math.PI / 180);
         let cameraZ = Math.abs(maxDim / 4 * Math.tan(fov * 2));
-        cameraZ *= 3; // zoom out a bit
+        cameraZ *= 3; 
         
         world.camera.controls.setLookAt(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ, center.x, center.y, center.z, true);
+    };
+
+    const unselectAll = () => {
+        selectedObject = null;
+        clearHighlight();
+        propertyPanel.innerHTML = '<h3 style="margin-top:0; border-bottom: 1px solid #eee; padding-bottom: 0.8rem; color: #1a1b1e;">Property Editor</h3><p style="color:#888;">Select an element to view properties.</p>';
     };
 
     const createRoomModal = () => {
@@ -247,6 +329,7 @@ async function init() {
                     <h2 style="color: #1a1b1e; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.4rem; border-bottom: 2px solid #007bff; padding-bottom: 0.6rem;">BIM Configurator</h2>
                     <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                         <bim-button label="Fit View" icon="fullscreen" @click=${fitToView}></bim-button>
+                        <bim-button label="Unselect All" icon="close" @click=${unselectAll}></bim-button>
                     </div>
                     <bim-panel label="Construction" active expanded>
                         <bim-panel-section label="Setup" expanded>
@@ -284,6 +367,8 @@ async function init() {
     const mouse = new THREE.Vector2();
 
     container.addEventListener('click', (event) => {
+        if (transformControls.dragging) return;
+        
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -297,8 +382,13 @@ async function init() {
             }
             
             if (obj.userData.type) {
-                highlightEffect(obj);
-                updateInspector(obj);
+                if (selectedObject === obj) {
+                    unselectAll();
+                } else {
+                    applyHighlight(obj);
+                    updateInspector(obj);
+                    zoomToObject(obj);
+                }
             }
         }
     });
