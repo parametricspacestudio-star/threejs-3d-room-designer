@@ -11,12 +11,14 @@ async function init() {
     console.log("Initializing Hybrid BIM Configurator...");
     const components = new OBC.Components();
     const worlds = components.get(OBC.Worlds);
-    const world = worlds.create<OBC.SimpleScene, OBC.OrthoPerspectiveCamera, OBC.SimpleRenderer>();
     
+    const world = worlds.create<OBC.SimpleScene, OBC.OrthoPerspectiveCamera, OBC.SimpleRenderer>();
     world.name = 'main';
     const sceneComponent = new OBC.SimpleScene(components);
     sceneComponent.setup();
     world.scene = sceneComponent;
+    
+    world.scene.three.background = new THREE.Color(0xffffff);
     
     const arch = new ArchitectureFragments(components);
     const gltfLoader = new GLTFLoader();
@@ -39,82 +41,152 @@ async function init() {
     fragments.init();
     components.init();
 
+    const highlighter = components.get(OBCF.Highlighter);
+    highlighter.setup({ world });
+    highlighter.enabled = true;
+
+    let slabWidth = 6;
+    let slabDepth = 6;
+    let wallHeight = 2.8;
+    let currentSlab: THREE.Mesh | null = null;
+    let selectedObject: THREE.Object3D | null = null;
+
+    const propertyPanel = document.createElement('div');
+    propertyPanel.style.cssText = `
+        background: rgba(255, 255, 255, 0.95);
+        color: #333;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #ddd;
+        font-family: sans-serif;
+        min-width: 260px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        pointer-events: auto;
+    `;
+
+    const highlightEffect = (obj: THREE.Object3D) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        const originalMaterial = obj.material;
+        const highlightMaterial = new THREE.MeshStandardMaterial({
+            color: 0x007bff,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+        obj.material = highlightMaterial;
+        setTimeout(() => { obj.material = originalMaterial; }, 500);
+    };
+
+    const updateInspector = (obj: THREE.Object3D) => {
+        selectedObject = obj;
+        const data = obj.userData;
+        
+        let html = `<h3 style="margin-top:0; border-bottom: 2px solid #eee; padding-bottom: 0.8rem; color: #1a1b1e;">Property Editor</h3>`;
+        
+        for (const [key, value] of Object.entries(data)) {
+            if (key === 'id') {
+                html += `<div style="margin: 0.8rem 0; font-size: 0.75rem; color: #888;">ID: ${value}</div>`;
+                continue;
+            }
+            
+            const isNumber = typeof value === 'number';
+            html += `
+                <div style="margin: 0.8rem 0; display: flex; flex-direction: column; gap: 0.3rem;">
+                    <label style="color: #666; font-size: 0.85rem;">${key}:</label>
+                    <input type="${isNumber ? 'number' : 'text'}" 
+                           value="${value}" 
+                           data-key="${key}"
+                           style="background: #f8f9fa; border: 1px solid #ced4da; padding: 6px; border-radius: 4px; outline: none;"
+                           class="prop-input">
+                </div>
+            `;
+        }
+
+        html += `
+            <div style="margin-top: 1.2rem; display: flex; gap: 0.5rem;">
+                <button id="apply-props" style="flex: 1; padding: 10px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Save Changes</button>
+            </div>
+        `;
+
+        propertyPanel.innerHTML = html;
+
+        const btn = propertyPanel.querySelector('#apply-props');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                const inputs = propertyPanel.querySelectorAll('.prop-input');
+                inputs.forEach((input: any) => {
+                    const k = input.getAttribute('data-key');
+                    const val = input.type === 'number' ? Number(input.value) : input.value;
+                    obj.userData[k] = val;
+                    
+                    if (obj instanceof THREE.Mesh) {
+                        const d = obj.userData;
+                        if (d.type === 'Wall') {
+                            const newGeo = new THREE.BoxGeometry(d.length || 1, d.height || 2.5, d.thickness || 0.15);
+                            obj.geometry.dispose();
+                            obj.geometry = newGeo;
+                            obj.position.y = (d.height || 2.5) / 2;
+                        } else if (d.type === 'Slab') {
+                            const newGeo = new THREE.BoxGeometry(d.width || 5, d.thickness || 0.2, d.depth || 5);
+                            obj.geometry.dispose();
+                            obj.geometry = newGeo;
+                            obj.position.y = -(d.thickness || 0.2) / 2;
+                        }
+                    }
+                });
+                updateInspector(obj);
+                highlightEffect(obj);
+            });
+        }
+    };
+
     const addFurniture = (modelName: string) => {
         const fullPath = `/Blueprint3D-assets/models/glb/special/${modelName}`;
         gltfLoader.load(fullPath, (gltf) => {
             const model = gltf.scene;
-            model.userData = { type: 'Furniture', name: modelName };
+            model.userData = { type: 'Furniture', name: modelName.replace('.glb', ''), id: THREE.MathUtils.generateUUID() };
             model.traverse((child) => {
-                if (child instanceof THREE.Mesh) {
-                    child.userData = { type: 'Furniture', name: modelName };
-                }
+                if (child instanceof THREE.Mesh) child.userData = model.userData;
             });
             world.scene.three.add(model);
         }, undefined, () => {
             const fallbackPath = `/Blueprint3D-assets/models/glb/${modelName}`;
             gltfLoader.load(fallbackPath, (gltf) => {
                 const model = gltf.scene;
-                model.userData = { type: 'Furniture', name: modelName };
+                model.userData = { type: 'Furniture', name: modelName.replace('.glb', ''), id: THREE.MathUtils.generateUUID() };
                 model.traverse((child) => {
-                    if (child instanceof THREE.Mesh) {
-                        child.userData = { type: 'Furniture', name: modelName };
-                    }
+                    if (child instanceof THREE.Mesh) child.userData = model.userData;
                 });
                 world.scene.three.add(model);
             });
         });
     };
 
-    let slabWidth = 6;
-    let slabDepth = 6;
-    let wallHeight = 2.8;
-    let currentSlab: THREE.Mesh | null = null;
-
-    const propertyPanel = document.createElement('div');
-    propertyPanel.style.cssText = `
-        background: rgba(26, 27, 30, 0.9);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        border: 1px solid #444;
-        font-family: sans-serif;
-        min-width: 240px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    `;
-    propertyPanel.innerHTML = '<h3 style="margin-top:0; border-bottom: 1px solid #555; padding-bottom: 0.5rem;">Properties</h3><p style="color:#aaa;">Select an element to view properties.</p>';
-
     const createRoomModal = () => {
         const modal = BUI.Component.create<any>(() => {
             return BUI.html`
                 <bim-modal label="Room Configuration" icon="measurement">
-                    <bim-panel style="padding: 1.5rem; gap: 1.2rem; display: flex; flex-direction: column; background: #1a1b1e; min-width: 320px;">
-                        <bim-label style="color: #fff; font-size: 1.1rem; font-weight: bold;">Slab & Wall Settings</bim-label>
-                        
+                    <bim-panel style="padding: 1.5rem; gap: 1.2rem; display: flex; flex-direction: column; background: #fff; min-width: 320px;">
+                        <bim-label style="color: #333; font-size: 1.1rem; font-weight: bold;">Initial Room Setup</bim-label>
                         <div style="display: flex; flex-direction: column; gap: 1rem;">
                             <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                                <bim-label style="color: #999;">Slab Width (X):</bim-label>
-                                <input type="number" .value="${slabWidth.toString()}" @input="${(e: any) => slabWidth = Number(e.target.value)}" 
-                                    style="background: #2a2b2e; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                                <bim-label style="color: #666;">Width (X):</bim-label>
+                                <input type="number" .value="${slabWidth.toString()}" @input="${(e: any) => slabWidth = Number(e.target.value)}" style="background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                                <bim-label style="color: #999;">Slab Depth (Y):</bim-label>
-                                <input type="number" .value="${slabDepth.toString()}" @input="${(e: any) => slabDepth = Number(e.target.value)}" 
-                                    style="background: #2a2b2e; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                                <bim-label style="color: #666;">Depth (Y):</bim-label>
+                                <input type="number" .value="${slabDepth.toString()}" @input="${(e: any) => slabDepth = Number(e.target.value)}" style="background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                                <bim-label style="color: #999;">Default Wall Height:</bim-label>
-                                <input type="number" .value="${wallHeight.toString()}" @input="${(e: any) => wallHeight = Number(e.target.value)}" 
-                                    style="background: #2a2b2e; color: #fff; border: 1px solid #444; padding: 8px; border-radius: 4px;">
+                                <bim-label style="color: #666;">Wall Height:</bim-label>
+                                <input type="number" .value="${wallHeight.toString()}" @input="${(e: any) => wallHeight = Number(e.target.value)}" style="background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
                             </div>
                         </div>
-
-                        <div style="margin-top: 1rem;">
-                            <bim-button label="Apply and Create Slab" style="width: 100%;" @click=${() => {
-                                if (currentSlab) world.scene.three.remove(currentSlab);
-                                currentSlab = arch.createSlab(slabWidth, slabDepth, 0.2);
-                                modal.active = false;
-                            }}></bim-button>
-                        </div>
+                        <bim-button label="Apply" style="width: 100%;" @click=${() => {
+                            if (currentSlab) world.scene.three.remove(currentSlab);
+                            currentSlab = arch.createSlab(slabWidth, slabDepth, 0.2);
+                            modal.active = false;
+                        }}></bim-button>
                     </bim-panel>
                 </bim-modal>
             `;
@@ -124,10 +196,7 @@ async function init() {
     };
 
     const placeWallOnEdge = (edge: 'N' | 'S' | 'E' | 'W') => {
-        if (!currentSlab) {
-            alert("Please define the slab size first!");
-            return;
-        }
+        if (!currentSlab) return;
         const w = slabWidth / 2;
         const d = slabDepth / 2;
         let p1, p2;
@@ -141,20 +210,17 @@ async function init() {
     const mainLayout = BUI.Component.create<any>(() => {
         return BUI.html`
             <div style="position: fixed; inset: 0; pointer-events: none; z-index: 99999; display: flex; justify-content: space-between; padding: 1.5rem;">
-                <div style="pointer-events: auto; width: 340px; display: flex; flex-direction: column; gap: 1rem; background: rgba(26, 27, 30, 0.95); padding: 1.5rem; border-radius: 12px; border: 1px solid #333; height: fit-content; box-shadow: 0 10px 40px rgba(0,0,0,0.7);">
-                    <h2 style="color: #fff; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.3rem;">BIM Hub v3</h2>
+                <div style="pointer-events: auto; width: 340px; display: flex; flex-direction: column; gap: 1rem; background: rgba(255, 255, 255, 0.95); padding: 1.5rem; border-radius: 12px; border: 1px solid #ddd; height: fit-content; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1a1b1e; margin: 0 0 1rem 0; font-family: sans-serif; font-size: 1.4rem; border-bottom: 2px solid #007bff; padding-bottom: 0.6rem;">BIM Configurator</h2>
                     <bim-panel label="Construction" active expanded>
-                        <bim-panel-section label="Room Config" expanded>
+                        <bim-panel-section label="Setup" expanded>
                             <div style="display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem;">
-                                <bim-button label="Set Dimensions & Height" @click=${createRoomModal}></bim-button>
-                                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                                    <bim-label style="color: #777; font-size: 0.8rem;">Add Walls to Edges:</bim-label>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                                        <bim-button label="Wall North" @click=${() => placeWallOnEdge('N')}></bim-button>
-                                        <bim-button label="Wall South" @click=${() => placeWallOnEdge('S')}></bim-button>
-                                        <bim-button label="Wall East" @click=${() => placeWallOnEdge('E')}></bim-button>
-                                        <bim-button label="Wall West" @click=${() => placeWallOnEdge('W')}></bim-button>
-                                    </div>
+                                <bim-button label="1. Define Room" @click=${createRoomModal}></bim-button>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                    <bim-button label="Wall N" @click=${() => placeWallOnEdge('N')}></bim-button>
+                                    <bim-button label="Wall S" @click=${() => placeWallOnEdge('S')}></bim-button>
+                                    <bim-button label="Wall E" @click=${() => placeWallOnEdge('E')}></bim-button>
+                                    <bim-button label="Wall W" @click=${() => placeWallOnEdge('W')}></bim-button>
                                 </div>
                             </div>
                         </bim-panel-section>
@@ -189,20 +255,14 @@ async function init() {
         const intersects = raycaster.intersectObjects(world.scene.three.children, true);
 
         if (intersects.length > 0) {
-            let selectedObject = intersects[0].object;
-            while (selectedObject.parent && Object.keys(selectedObject.userData).length === 0) {
-                selectedObject = selectedObject.parent as any;
+            let obj = intersects[0].object;
+            while (obj.parent && obj.parent !== world.scene.three && !obj.userData.type) {
+                obj = obj.parent;
             }
             
-            const data = selectedObject.userData;
-            if (Object.keys(data).length > 0) {
-                propertyPanel.innerHTML = `<h3 style="margin-top:0; border-bottom: 1px solid #555; padding-bottom: 0.5rem;">Properties</h3>` + 
-                    Object.entries(data).map(([k, v]) => `
-                        <div style="margin: 0.5rem 0; display: flex; justify-content: space-between;">
-                            <span style="color: #999;">${k}:</span>
-                            <span style="color: #fff; font-weight: bold;">${v}</span>
-                        </div>
-                    `).join('');
+            if (obj.userData.type) {
+                highlightEffect(obj);
+                updateInspector(obj);
             }
         }
     });
