@@ -20,7 +20,7 @@ export class ArchitectureFragments {
         const geometry = new THREE.BoxGeometry(length, height, thickness);
         const material = new THREE.MeshStandardMaterial({ color: 0x808080 });
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.userData = { type: 'Wall', height, thickness, length };
+        mesh.userData = { type: 'Wall', height: `${height}m`, thickness: `${thickness}m`, length: `${length.toFixed(2)}m` };
         
         const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
         mesh.position.set(center.x, height / 2, center.z);
@@ -41,8 +41,9 @@ export class ArchitectureFragments {
         const geometry = new THREE.BoxGeometry(width, thickness, depth);
         const material = new THREE.MeshStandardMaterial({ color: 0x404040 });
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.userData = { type: 'Slab', width, depth, thickness };
+        mesh.userData = { type: 'Slab', width: `${width}m`, depth: `${depth}m`, thickness: `${thickness}m` };
         
+        // Ensure slab is placed correctly at origin
         mesh.position.set(0, -thickness / 2, 0);
         
         const worlds = this.components.get(OBC.Worlds);

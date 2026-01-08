@@ -44,12 +44,23 @@ async function init() {
         gltfLoader.load(fullPath, (gltf) => {
             const model = gltf.scene;
             model.userData = { type: 'Furniture', name: modelName };
+            model.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                    child.userData = { type: 'Furniture', name: modelName };
+                }
+            });
             world.scene.three.add(model);
-        }, undefined, (err) => {
+        }, undefined, () => {
             const fallbackPath = `/Blueprint3D-assets/models/glb/${modelName}`;
             gltfLoader.load(fallbackPath, (gltf) => {
-                gltf.scene.userData = { type: 'Furniture', name: modelName };
-                world.scene.three.add(gltf.scene);
+                const model = gltf.scene;
+                model.userData = { type: 'Furniture', name: modelName };
+                model.traverse((child) => {
+                    if (child instanceof THREE.Mesh) {
+                        child.userData = { type: 'Furniture', name: modelName };
+                    }
+                });
+                world.scene.three.add(model);
             });
         });
     };
@@ -63,13 +74,14 @@ async function init() {
     propertyPanel.style.cssText = `
         background: rgba(26, 27, 30, 0.9);
         color: white;
-        padding: 1rem;
+        padding: 1.5rem;
         border-radius: 8px;
         border: 1px solid #444;
         font-family: sans-serif;
-        min-width: 200px;
+        min-width: 240px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     `;
-    propertyPanel.innerHTML = '<h3>Properties</h3><p>Select an element to view properties.</p>';
+    propertyPanel.innerHTML = '<h3 style="margin-top:0; border-bottom: 1px solid #555; padding-bottom: 0.5rem;">Properties</h3><p style="color:#aaa;">Select an element to view properties.</p>';
 
     const createRoomModal = () => {
         const modal = BUI.Component.create<any>(() => {
@@ -97,7 +109,7 @@ async function init() {
                         </div>
 
                         <div style="margin-top: 1rem;">
-                            <bim-button label="Apply Slab Dimensions" style="width: 100%;" @click=${() => {
+                            <bim-button label="Apply and Create Slab" style="width: 100%;" @click=${() => {
                                 if (currentSlab) world.scene.three.remove(currentSlab);
                                 currentSlab = arch.createSlab(slabWidth, slabDepth, 0.2);
                                 modal.active = false;
@@ -112,7 +124,10 @@ async function init() {
     };
 
     const placeWallOnEdge = (edge: 'N' | 'S' | 'E' | 'W') => {
-        if (!currentSlab) return;
+        if (!currentSlab) {
+            alert("Please define the slab size first!");
+            return;
+        }
         const w = slabWidth / 2;
         const d = slabDepth / 2;
         let p1, p2;
@@ -132,15 +147,18 @@ async function init() {
                         <bim-panel-section label="Room Config" expanded>
                             <div style="display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem;">
                                 <bim-button label="Set Dimensions & Height" @click=${createRoomModal}></bim-button>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                                    <bim-button label="Wall N" @click=${() => placeWallOnEdge('N')}></bim-button>
-                                    <bim-button label="Wall S" @click=${() => placeWallOnEdge('S')}></bim-button>
-                                    <bim-button label="Wall E" @click=${() => placeWallOnEdge('E')}></bim-button>
-                                    <bim-button label="Wall W" @click=${() => placeWallOnEdge('W')}></bim-button>
+                                <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                                    <bim-label style="color: #777; font-size: 0.8rem;">Add Walls to Edges:</bim-label>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                        <bim-button label="Wall North" @click=${() => placeWallOnEdge('N')}></bim-button>
+                                        <bim-button label="Wall South" @click=${() => placeWallOnEdge('S')}></bim-button>
+                                        <bim-button label="Wall East" @click=${() => placeWallOnEdge('E')}></bim-button>
+                                        <bim-button label="Wall West" @click=${() => placeWallOnEdge('W')}></bim-button>
+                                    </div>
                                 </div>
                             </div>
                         </bim-panel-section>
-                        <bim-panel-section label="Assets" expanded>
+                        <bim-panel-section label="Library" expanded>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; padding: 0.5rem;">
                                 <bim-button label="Chair" @click=${() => addFurniture('chair.glb')}></bim-button>
                                 <bim-button label="Table" @click=${() => addFurniture('table.glb')}></bim-button>
@@ -160,25 +178,37 @@ async function init() {
         document.getElementById('inspector-container')!.appendChild(propertyPanel);
     }
     
-    const highlighter = components.get(OBCF.Highlighter);
-    highlighter.setup({ world });
-    
-    // Selection logic
-    container.addEventListener('click', () => {
-        const selection = highlighter.selection.main;
-        if (selection.size > 0) {
-            const fragmentID = Array.from(selection)[0];
-            const fragment = fragments.list.get(fragmentID);
-            if (fragment && fragment.mesh) {
-                const data = fragment.mesh.userData;
-                propertyPanel.innerHTML = `<h3>Properties</h3>` + 
-                    Object.entries(data).map(([k, v]) => `<p><b>${k}:</b> ${v}</p>`).join('');
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    container.addEventListener('click', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, world.camera.three);
+        const intersects = raycaster.intersectObjects(world.scene.three.children, true);
+
+        if (intersects.length > 0) {
+            let selectedObject = intersects[0].object;
+            while (selectedObject.parent && Object.keys(selectedObject.userData).length === 0) {
+                selectedObject = selectedObject.parent as any;
+            }
+            
+            const data = selectedObject.userData;
+            if (Object.keys(data).length > 0) {
+                propertyPanel.innerHTML = `<h3 style="margin-top:0; border-bottom: 1px solid #555; padding-bottom: 0.5rem;">Properties</h3>` + 
+                    Object.entries(data).map(([k, v]) => `
+                        <div style="margin: 0.5rem 0; display: flex; justify-content: space-between;">
+                            <span style="color: #999;">${k}:</span>
+                            <span style="color: #fff; font-weight: bold;">${v}</span>
+                        </div>
+                    `).join('');
             }
         }
     });
 
     components.get(OBC.Grids).create(world);
-    await world.camera.controls.setLookAt(10, 10, 10, 0, 0, 0);
+    await world.camera.controls.setLookAt(8, 8, 8, 0, 0, 0);
 }
 
 init().catch(err => console.error(err));

@@ -22,9 +22,9 @@ A modern 3D room configurator that combines standard GLB furniture placement wit
 
 ## Features
 - **Dynamic Slab Creation**: User-defined room dimensions via modal UI.
-- **Perpendicular Wall Placement**: Automatically align walls to slab edges.
+- **Variable Wall Height**: Define height for walls during placement.
+- **BIM Property Inspector**: Select any element (wall, slab, furniture) to view its metadata.
 - **Furniture Catalog**: Catalog of GLB models for interior configuration.
-- **BIM Integration**: Architectural elements are managed as components in the OBC ecosystem.
 
 ## Running the Application
 ```bash
