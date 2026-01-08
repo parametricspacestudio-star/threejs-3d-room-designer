@@ -58,13 +58,11 @@ async function init() {
     resize();
     window.addEventListener('resize', resize);
     
-    const fragments = components.get(OBC.FragmentsManager);
-    fragments.init();
-    components.init();
-
     const highlighter = components.get(OBCF.Highlighter);
     highlighter.setup({ world });
     highlighter.enabled = true;
+
+    components.init();
 
     // Transform Controls
     if (!world.renderer || !world.camera) {
